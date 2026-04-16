@@ -184,5 +184,13 @@ streamlit run app.py                     # Run the full platform!
 
 ---
 
+## Community & Communication
+
+Join our Discord to ask questions, share progress, and connect with other participants:
+
+**Discord:** https://discord.gg/UGsfhZq3
+
+---
+
 **The Workshop Team**
 School of Physics, Engineering and Computer Science | University of Hertfordshire
