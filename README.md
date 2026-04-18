@@ -7,7 +7,7 @@
 ## 🥇 Challenge Winner — Session 5
 
 <p align="center">
-  <img src=""C:\Users\Dell\Downloads\WhatsApp Image 2026-04-18 at 9.18.13 PM.jpeg"" width="140" style="border-radius:50%;border:4px solid gold"/>
+  <img src="C:\Users\Dell\Downloads\WhatsApp Image 2026-04-18 at 9.18.13 PM.jpeg" width="140" style="border-radius:50%;border:4px solid gold"/>
 </p>
 
 <p align="center">
