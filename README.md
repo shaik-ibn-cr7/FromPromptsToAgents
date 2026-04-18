@@ -7,7 +7,8 @@
 ## 🥇 Challenge Winner — Session 5
 
 <p align="center">
-  <img src="C:\Users\Dell\Downloads\WhatsApp Image 2026-04-18 at 9.18.13 PM.jpeg" width="140" style="border-radius:50%;border:4px solid gold"/>
+  <img src="<img width="988" height="1600" alt="WhatsApp Image 2026-04-18 at 9 18 13 PM" src="https://github.com/user-attachments/assets/0619e3d1-b796-4c1a-bf5d-53b630e66ae8" />
+" width="140" style="border-radius:50%;border:4px solid gold"/>
 </p>
 
 <p align="center">
