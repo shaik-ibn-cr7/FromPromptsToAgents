@@ -4,6 +4,28 @@
 
 ---
 
+## 🥇 Challenge Winner — Session 5
+
+<p align="center">
+  <img src=""C:\Users\Dell\Downloads\WhatsApp Image 2026-04-18 at 9.18.13 PM.jpeg"" width="140" style="border-radius:50%;border:4px solid gold"/>
+</p>
+
+<p align="center">
+  <strong>🏆 First Place — Smart Budget RobotChef Challenge</strong><br/>
+  University of Hertfordshire · 18 April 2026
+</p>
+
+| Field | Detail |
+|---|---|
+| **Name** | Mahaboob Shaik |
+| **Student ID** | 24164385 |
+| **LinkedIn** | [linkedin.com/in/shaik-mahaboob07](https://www.linkedin.com/in/shaik-mahaboob07/) |
+| **Project** | Smart Budget RobotChef — A2A Multi-Agent System with `fit_budget`, `get_nutrition`, `get_price` MCP tools |
+
+> *"The system extended the RobotChef A2A baseline with a budget-aware Food Analysis Agent that picks the best dish within a user-defined budget and dietary constraints, then passes a full task specification to the Robotics Designer Agent."*
+
+---
+
 ## Presenters
 
 | Presenter | Role | LinkedIn |
@@ -51,7 +73,7 @@ Your prompt will show `(.venv)` when the environment is active.
 
 **Install dependencies for the session you are working on:**
 ```bash
-pip install -r session1/requirements.txt   # repeat for each session as needed
+pip install -r session1/requirements.txt
 ```
 
 > **Tip:** You only need to create the virtual environment once. Just re-run the `activate` command each time you open a new terminal.
@@ -60,66 +82,34 @@ pip install -r session1/requirements.txt   # repeat for each session as needed
 
 ## LLM Setup — Choose Your Backend
 
-This workshop supports **two LLM backends**. You need at least one working.
-
 ### Option 1: Local University LLM (Primary)
-
-The university runs **Qwen2.5-72B-Instruct** on a GPU cluster. This is the best option during the workshop — no SSH tunnel required, just set your `.env`:
-
-```
-LLM_SERVICE_URL=https://uhhpc.herts.ac.uk/qwen
-LLM_API_TOKEN=your-token-here
-```
-
-The workshop instructor will provide the token on the day.
-
 ### Option 2: Google Gemini (Free Fallback)
 
-If the local service is down or you're working from home, use Google Gemini. It's **free** and takes 2 minutes to set up.
-
-**Setup:**
 1. Go to **https://aistudio.google.com**
-2. Sign in with your Google account
-3. Click **"Get API Key"** in the left sidebar
-4. Click **"Create API key"** → select any project → copy the key
-5. keep the API key somewhere safe then copy it to the to .env  on each session:
-        In your `.env` file set:
-        ```
-         GEMINI_API_KEY=your-key-here
-        ```
-
-That's it! The code automatically detects which backend is available and uses it.
-
-**Test your connection:**
+2. Sign in → click **"Get API Key"** → **"Create API key"** → copy it
+3. In your `.env` file set:
+4. **Test your connection:**
 ```bash
 cd session1
-cp .env.example .env      # Copy the template
-# Then open .env and fill in your key(s) — see options above
+cp .env.example .env
 python llm_client.py
 ```
 
-You should see `Backend: local` or `Backend: gemini` and a test response.
-
-> **"No backend available"?** This means your `.env` file is missing or the keys are not filled in.
-> Make sure you copied `.env.example` to `.env` and set at least one of `LLM_API_TOKEN` or `GEMINI_API_KEY`.
-
 ---
 
-## How to Follow Along — Step by Step
-
-Each session has a `steps/` folder with numbered files. **Run them in order:**
+## How to Follow Along
 
 ### Session 1 : Building Blocks
 ```bash
 cd session1
 pip install -r requirements.txt
-cp .env.example .env        # Edit with your keys
+cp .env.example .env
 
-python steps/step1_hello_llm.py          # Your first LLM call
-python steps/step2_conversation.py       # Multi-turn chat
-python steps/step3_temperature.py        # Temperature comparison
-streamlit run steps/step4_chatbot.py     # Build a chatbot UI
-streamlit run steps/step5_personas.py    # Prompt engineering
+python steps/step1_hello_llm.py
+python steps/step2_conversation.py
+python steps/step3_temperature.py
+streamlit run steps/step4_chatbot.py
+streamlit run steps/step5_personas.py
 ```
 
 ### Session 2 : MCP & Robotics Agent
@@ -128,9 +118,9 @@ cd session2
 pip install -r requirements.txt
 cp .env.example .env
 
-python steps/step1_explore_data.py       # Browse the parts database
-python steps/step2_test_tools.py         # Test MCP tools directly
-python steps/step3_run_agent.py          # Run the full agent!
+python steps/step1_explore_data.py
+python steps/step2_test_tools.py
+python steps/step3_run_agent.py
 ```
 
 ### Session 3 : RAG Concepts
@@ -139,8 +129,8 @@ cd session3
 pip install -r requirements.txt
 cp .env.example .env
 
-python rag_demo.py                       # See RAG in action (demo only)
-streamlit run rag_streamlit.py 
+python rag_demo.py
+streamlit run rag_streamlit.py
 ```
 
 ### Session 4 : Recipe Agent
@@ -149,58 +139,58 @@ cd session4
 pip install -r requirements.txt
 cp .env.example .env
 
-python steps/step1_explore_dishes.py     # Browse the recipe database
-python steps/step2_test_tools.py         # Test recipe tools
-python steps/step3_run_agent.py          # Run the recipe agent
+python steps/step1_explore_dishes.py
+python steps/step2_test_tools.py
+python steps/step3_run_agent.py
 ```
 
-### Session 5 : A2A
+### Session 5 : A2A — Smart Budget RobotChef 🏆
 ```bash
 cd session5
 pip install -r requirements.txt
 cp .env.example .env
 
-streamlit run app.py                     # Run the full platform!
+streamlit run app.py
 ```
+
+**Session 5 features (Challenge winner's extension):**
+- 💰 **Smart Budget Mode** — set a budget (£5–£50), number of people, and dietary filter
+- 🥗 **`fit_budget`** — ranks all dishes by protein-per-£1 value score within budget
+- 🧪 **`get_nutrition`** — returns protein, carbs, fat, kcal, vitamins scaled to servings
+- 💷 **`get_price`** — returns cost per person and value score
+- 🤖 **Full A2A pipeline** — Agent 1 picks the dish, Agent 2 designs the robot
+
 ---
 
 ## Prerequisites
 
 - Python 3.10+
 - A Google account (for Gemini API key)
-- A code editor (VS Code recommended)
-- A GitHub account (for challenge submission)
+- VS Code (recommended)
+- A GitHub account
 
 ---
 
 ## Troubleshooting
 
 **"No LLM backend available"**
-→ Check your `.env` file has either a working `LLM_API_TOKEN` or `GEMINI_API_KEY`.
+→ Check your `.env` has either `LLM_API_TOKEN` or `GEMINI_API_KEY`.
 
 **"ModuleNotFoundError"**
-→ Make sure you ran `pip install -r requirements.txt` in the current session folder.
+→ Run `pip install -r requirements.txt` in the current session folder.
 
 **Gemini 429 Too Many Requests**
-→ The shared workshop key is rate-limited. You must get your own free key:
-1. Go to **https://aistudio.google.com** → sign in → click **"Get API Key"**
-2. Click **"Create API key"** → copy it
-3. Open your `.env` file and replace the existing value: `GEMINI_API_KEY=your-new-key`
+→ Get your own free key at https://aistudio.google.com and update `.env`.
 
-**Gemini returns another error**
-→ Check your API key at https://aistudio.google.com. The free tier has rate limits (15 requests/minute).
-
-**Streamlit text box not accepting keyboard input**
-→ Run `streamlit run` from a **standalone terminal**, not from inside PyCharm or VS Code. IDE-embedded terminals keep keyboard focus and intercept your keystrokes.
+**Streamlit not accepting keyboard input**
+→ Run from a standalone terminal, not inside VS Code or PyCharm.
 
 **Local service not reachable**
-→ Check your `LLM_SERVICE_URL` and `LLM_API_TOKEN` in `.env`. Try `curl https://uhhpc.herts.ac.uk/qwen/health` to verify the service is up.
+→ Check `LLM_SERVICE_URL` and `LLM_API_TOKEN` in `.env`.
 
 ---
 
 ## Community & Communication
-
-Join our Discord to ask questions, share progress, and connect with other participants:
 
 **Discord:** https://discord.gg/UGsfhZq3
 
