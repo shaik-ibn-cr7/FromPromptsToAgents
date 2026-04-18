@@ -1,19 +1,16 @@
 """
 Multi-Agent System: Recipe Agent + Robotics Agent with A2A Communication.
 =========================================================================
-Session 5: The Challenge - Robotic Chef Platform
+Session 5: The Challenge - Robotic Chef Platform (Budget Extension)
 
-This module implements the Agent-to-Agent (A2A) pipeline:
-1. Food Analysis Agent receives a dish name
-2. It calls the Recipe MCP Server to analyse the dish
-3. It creates a structured task specification for the Robotics Agent
-4. The Robotics Agent uses the Robotics MCP Server to design a robot
-5. The final robot specification is returned
+Extended from the Session 4 baseline with:
+  - run_budget_chef_pipeline(): budget-aware A2A pipeline
+  - BUDGET_FOOD_ANALYSIS_SYSTEM_PROMPT: instructs Agent 1 to use the new
+    get_nutrition / get_price / fit_budget MCP tools before picking a dish
+  - run_budget_food_analysis_agent(): budget-aware Agent 1
 
-The two agents communicate via a structured task specification - the output
-of Agent 1 becomes the input to Agent 2. This is the core A2A pattern.
-
-All LLM calls go through llm_client (local LLM service via requests).
+The original run_robotic_chef_pipeline() and all its helpers are unchanged
+so the existing Streamlit UI keeps working without modification.
 """
 
 import asyncio
@@ -27,12 +24,11 @@ from mcp.client.stdio import stdio_client
 
 import llm_client
 
-# Directory containing the MCP server scripts
 SERVER_DIR = Path(__file__).parent
 
 
 # ---------------------------------------------------------------------------
-# Core: Run an agent loop with an MCP server
+# Core: Run an agent loop with an MCP server  (unchanged)
 # ---------------------------------------------------------------------------
 
 async def run_agent_with_mcp(
@@ -57,7 +53,6 @@ async def run_agent_with_mcp(
         system_prompt: The system prompt defining the agent's role and behaviour.
         user_message: The user's input message to the agent.
         status_callback: Optional callable(str) for real-time status updates.
-                         Used by the Streamlit UI to show progress.
 
     Returns:
         The agent's final text response.
@@ -68,106 +63,65 @@ async def run_agent_with_mcp(
             status_callback(msg)
 
     _status(f"Starting MCP server: {Path(server_script).name}")
-
-    # Resolve the server script path
     server_path = str(Path(server_script).resolve())
-
-    # Set up MCP server connection via stdio
-    server_params = StdioServerParameters(
-        command=sys.executable,
-        args=[server_path],
-    )
+    server_params = StdioServerParameters(command=sys.executable, args=[server_path])
 
     async with stdio_client(server_params) as (read_stream, write_stream):
         async with ClientSession(read_stream, write_stream) as session:
-            # Initialise the MCP session
             await session.initialize()
             _status("MCP session initialised")
 
-            # Discover tools and convert to simple format for llm_client
             tools_result = await session.list_tools()
             tools = [
                 {
                     "name": t.name,
                     "description": t.description or "",
-                    "parameters": t.inputSchema
-                    if t.inputSchema
-                    else {"type": "object", "properties": {}},
+                    "parameters": t.inputSchema if t.inputSchema else {"type": "object", "properties": {}},
                 }
                 for t in tools_result.tools
             ]
-            _status(
-                f"Discovered {len(tools)} tools: "
-                f"{', '.join(t['name'] for t in tools)}"
-            )
+            _status(f"Discovered {len(tools)} tools: {', '.join(t['name'] for t in tools)}")
 
-            # Build initial conversation
             messages = [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_message},
             ]
 
-            # Agent loop (max 10 iterations to prevent runaway)
             last_content = ""
             for iteration in range(10):
                 _status(f"LLM call (iteration {iteration + 1})")
-
                 response = llm_client.chat(messages, tools=tools)
 
-                # If the LLM made tool calls, execute them
                 if response["tool_calls"]:
-                    # Append the assistant message (with tool calls) to conversation
-                    messages.append(
-                        {"role": "assistant", "content": response["raw"]}
-                    )
-
+                    messages.append({"role": "assistant", "content": response["raw"]})
                     for tc in response["tool_calls"]:
                         fn_name = tc["name"]
                         fn_args = tc["arguments"]
-
                         _status(f"Calling tool: {fn_name}")
-
-                        # Execute the tool via MCP
                         try:
                             result = await session.call_tool(fn_name, fn_args)
-                            # Extract text content from the MCP result
                             tool_output = ""
                             if result.content:
                                 for content_block in result.content:
                                     if hasattr(content_block, "text"):
                                         tool_output += content_block.text
-                            _status(
-                                f"Tool {fn_name} returned {len(tool_output)} chars"
-                            )
+                            _status(f"Tool {fn_name} returned {len(tool_output)} chars")
                         except Exception as e:
                             tool_output = json.dumps({"error": str(e)})
                             _status(f"Tool {fn_name} error: {e}")
-
-                        # Add tool result to conversation
-                        messages.append(
-                            {
-                                "role": "tool",
-                                "name": fn_name,
-                                "content": tool_output,
-                            }
-                        )
+                        messages.append({"role": "tool", "name": fn_name, "content": tool_output})
                 else:
-                    # No tool calls -- the agent produced a final text response
                     _status("Agent produced final response")
                     return response["content"] or ""
 
                 last_content = response.get("content") or ""
 
-            # If we exhausted iterations, return whatever we have
             _status("Max iterations reached")
-            return (
-                last_content
-                or "Agent did not produce a final response within the iteration limit."
-            )
+            return last_content or "Agent did not produce a final response within the iteration limit."
 
 
 # ---------------------------------------------------------------------------
-# Agent 1: Food Analysis Agent
+# Agent 1 (original): Food Analysis Agent  (unchanged)
 # ---------------------------------------------------------------------------
 
 FOOD_ANALYSIS_SYSTEM_PROMPT = """\
@@ -229,26 +183,13 @@ estimates wherever possible.
 
 
 async def run_food_analysis_agent(dish_name: str, status_callback=None) -> str:
-    """
-    Run Agent 1: Food Analysis Agent.
-
-    Connects to the Recipe MCP Server and thoroughly analyses the specified dish,
-    producing a structured task specification for the Robotics Agent.
-
-    Args:
-        dish_name: Name of the dish to analyse (e.g. 'pasta carbonara').
-        status_callback: Optional callable(str) for real-time status updates.
-
-    Returns:
-        A detailed task specification string.
-    """
+    """Run Agent 1: Food Analysis Agent (original, dish-name-driven)."""
     server_script = str(SERVER_DIR / "recipe_mcp_server.py")
     user_message = (
         f"Please analyse the dish '{dish_name}' in complete detail. "
         f"Use all available tools to gather comprehensive information, then produce "
         f"a full task specification for the Robotics Design Agent."
     )
-
     return await run_agent_with_mcp(
         server_script=server_script,
         system_prompt=FOOD_ANALYSIS_SYSTEM_PROMPT,
@@ -258,7 +199,111 @@ async def run_food_analysis_agent(dish_name: str, status_callback=None) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Agent 2: Robotics Designer Agent
+# Agent 1 (NEW): Budget-Aware Food Analysis Agent
+# ---------------------------------------------------------------------------
+
+BUDGET_FOOD_ANALYSIS_SYSTEM_PROMPT = """\
+You are the Smart Budget Food Analysis Agent, an expert culinary analyst and \
+nutritionist. Your role is to:
+
+1. Use fit_budget() to find all dishes within the user's budget and people count, \
+   applying any dietary filter requested.
+2. Use get_nutrition() and get_price() on the top candidates to compare them in detail.
+3. CHOOSE the single best dish by balancing:
+   - Cost vs nutrition (protein and key vitamins)
+   - Dietary requirements
+   - Cooking feasibility
+4. Use analyse_dish(), get_cooking_techniques(), and get_safety_requirements() to \
+   fully analyse the chosen dish.
+5. Produce a BUDGET TASK SPECIFICATION with these clearly labelled sections:
+
+## Budget Summary
+- Budget, people, dietary filter
+- All dishes considered (name, cost, protein)
+- Chosen dish and WHY (explicit trade-off reasoning)
+
+## Dish Overview
+- Name, cuisine, difficulty, servings, total time
+
+## Nutritional Profile (for chosen dish, scaled to requested people)
+- Protein, carbs, fat, fibre, kcal per person and total
+- Key vitamins provided
+- Allergens
+
+## Cost Breakdown
+- Total cost, cost per person, budget remaining
+- Value score (protein per £1)
+
+## Physical Tasks Required
+For each cooking step, describe the physical action:
+- Cutting/chopping (precision, force, dimensions)
+- Stirring/mixing (speed, duration)
+- Pouring/dispensing (volume, temperature)
+- Heating/temperature control (exact temperatures, durations)
+- Timing coordination
+
+## Cooking Techniques with Precision Requirements
+Each technique with temperature, duration, precision level, failure modes.
+
+## Equipment to Operate
+Each piece of equipment with operating requirements and physical interactions.
+
+## Safety Requirements
+Temperature hazards, splash risks, timing-critical steps, food safety.
+
+## Robotics Task Specification
+A summary for the Robotics Design Agent:
+- All manipulation tasks with DoF and force ranges
+- Sensing requirements (temperature, vision, weight, force)
+- Workspace requirements
+- Speed and timing constraints
+- Safety constraints
+
+Be thorough. The Robotics Agent depends entirely on your analysis.
+"""
+
+
+async def run_budget_food_analysis_agent(
+    budget_gbp: float,
+    people: int,
+    dietary_filter: str = "none",
+    status_callback=None,
+) -> str:
+    """
+    Run the budget-aware Agent 1.
+
+    Uses fit_budget, get_nutrition, and get_price to pick the best dish
+    within budget before doing the full task-specification analysis.
+
+    Args:
+        budget_gbp:      Total budget in GBP.
+        people:          Number of people to feed.
+        dietary_filter:  'none' | 'vegetarian' | 'vegan' | 'gluten_free' | 'pescatarian'
+        status_callback: Optional callable(str) for real-time status updates.
+
+    Returns:
+        A detailed budget task specification string.
+    """
+    server_script = str(SERVER_DIR / "recipe_mcp_server.py")
+    user_message = (
+        f"I have a budget of £{budget_gbp:.2f} for {people} people. "
+        f"Dietary requirement: {dietary_filter}. "
+        f"Please use fit_budget to find all dishes within this budget, "
+        f"compare their nutrition and cost using get_nutrition and get_price, "
+        f"then choose the best dish. Fully analyse the chosen dish using "
+        f"analyse_dish, get_cooking_techniques, and get_safety_requirements. "
+        f"Produce a complete budget task specification for the Robotics Design Agent."
+    )
+    return await run_agent_with_mcp(
+        server_script=server_script,
+        system_prompt=BUDGET_FOOD_ANALYSIS_SYSTEM_PROMPT,
+        user_message=user_message,
+        status_callback=status_callback,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Agent 2: Robotics Designer Agent  (unchanged)
 # ---------------------------------------------------------------------------
 
 ROBOTICS_DESIGN_SYSTEM_PROMPT = """\
@@ -324,19 +369,7 @@ selection based on the task specification you received.
 
 
 async def run_robotics_agent(task_specification: str, status_callback=None) -> str:
-    """
-    Run Agent 2: Robotics Designer Agent.
-
-    Connects to the Robotics MCP Server and designs a complete robotic platform
-    based on the task specification from the Food Analysis Agent.
-
-    Args:
-        task_specification: The detailed task specification from Agent 1.
-        status_callback: Optional callable(str) for real-time status updates.
-
-    Returns:
-        A detailed robot design specification string.
-    """
+    """Run Agent 2: Robotics Designer Agent."""
     server_script = str(SERVER_DIR / "robotics_mcp_server.py")
     user_message = (
         f"Based on the following task specification from the Food Analysis Agent, "
@@ -344,7 +377,6 @@ async def run_robotics_agent(task_specification: str, status_callback=None) -> s
         f"thoroughly and select the best components for each requirement.\n\n"
         f"--- TASK SPECIFICATION ---\n{task_specification}\n--- END SPECIFICATION ---"
     )
-
     return await run_agent_with_mcp(
         server_script=server_script,
         system_prompt=ROBOTICS_DESIGN_SYSTEM_PROMPT,
@@ -354,43 +386,75 @@ async def run_robotics_agent(task_specification: str, status_callback=None) -> s
 
 
 # ---------------------------------------------------------------------------
-# Pipeline: Full Robotic Chef Pipeline (A2A)
+# Pipeline A: Original Robotic Chef Pipeline (unchanged)
 # ---------------------------------------------------------------------------
 
-async def run_robotic_chef_pipeline(
-    dish_name: str, status_callback=None
-) -> dict:
+async def run_robotic_chef_pipeline(dish_name: str, status_callback=None) -> dict:
     """
-    Run the full Robotic Chef A2A pipeline.
-
-    This is the main entry point that orchestrates both agents:
-    1. Runs the Food Analysis Agent to analyse the dish
-    2. Passes the task specification to the Robotics Designer Agent
-    3. Returns both outputs
-
-    Args:
-        dish_name: Name of the dish (e.g. 'pasta carbonara').
-        status_callback: Optional callable(str) for real-time status updates.
+    Run the full Robotic Chef A2A pipeline (original, dish-name-driven).
 
     Returns:
-        A dict with keys:
-            - 'food_analysis': str - The Food Analysis Agent's output
-            - 'robot_design': str - The Robotics Designer Agent's output
+        dict with keys 'food_analysis' and 'robot_design'.
     """
-
     def _status(msg: str):
         if status_callback:
             status_callback(msg)
 
-    # ---- Stage 1: Food Analysis Agent ----
     _status("=== Stage 1: Food Analysis Agent ===")
-    food_analysis = await run_food_analysis_agent(
-        dish_name=dish_name,
-        status_callback=status_callback,
-    )
+    food_analysis = await run_food_analysis_agent(dish_name=dish_name, status_callback=status_callback)
     _status("Food Analysis Agent complete")
 
-    # ---- Stage 2: Robotics Designer Agent ----
+    _status("=== Stage 2: Robotics Designer Agent ===")
+    robot_design = await run_robotics_agent(task_specification=food_analysis, status_callback=status_callback)
+    _status("Robotics Designer Agent complete")
+
+    return {"food_analysis": food_analysis, "robot_design": robot_design}
+
+
+# ---------------------------------------------------------------------------
+# Pipeline B (NEW): Budget-Aware Robotic Chef Pipeline
+# ---------------------------------------------------------------------------
+
+async def run_budget_chef_pipeline(
+    budget_gbp: float,
+    people: int,
+    dietary_filter: str = "none",
+    status_callback=None,
+) -> dict:
+    """
+    Run the budget-aware Robotic Chef A2A pipeline.
+
+    Stage 1: Budget Food Analysis Agent picks the best dish within budget,
+             checks nutrition/cost, and produces a full task specification.
+    Stage 2: Robotics Designer Agent designs a robot for the chosen dish.
+
+    Args:
+        budget_gbp:      Total budget in GBP.
+        people:          Number of people to feed.
+        dietary_filter:  Dietary restriction string.
+        status_callback: Optional callable(str) for real-time status updates.
+
+    Returns:
+        dict with keys:
+            'food_analysis'  — Budget Task Specification from Agent 1
+            'robot_design'   — Robot Design from Agent 2
+            'budget_gbp'     — echo of budget
+            'people'         — echo of people
+            'dietary_filter' — echo of filter
+    """
+    def _status(msg: str):
+        if status_callback:
+            status_callback(msg)
+
+    _status("=== Stage 1: Budget Food Analysis Agent ===")
+    food_analysis = await run_budget_food_analysis_agent(
+        budget_gbp=budget_gbp,
+        people=people,
+        dietary_filter=dietary_filter,
+        status_callback=status_callback,
+    )
+    _status("Budget Food Analysis Agent complete")
+
     _status("=== Stage 2: Robotics Designer Agent ===")
     robot_design = await run_robotics_agent(
         task_specification=food_analysis,
@@ -401,42 +465,56 @@ async def run_robotic_chef_pipeline(
     return {
         "food_analysis": food_analysis,
         "robot_design": robot_design,
+        "budget_gbp": budget_gbp,
+        "people": people,
+        "dietary_filter": dietary_filter,
     }
 
 
 # ---------------------------------------------------------------------------
-# CLI entry point (for testing without Streamlit)
+# CLI entry point
 # ---------------------------------------------------------------------------
 
 async def _main():
-    """Run the pipeline from the command line for testing."""
     import argparse
 
     parser = argparse.ArgumentParser(description="Robotic Chef Pipeline - CLI")
-    parser.add_argument(
-        "dish",
-        nargs="?",
-        default="pasta carbonara",
-        help="Name of the dish to analyse (default: pasta carbonara)",
-    )
+    subparsers = parser.add_subparsers(dest="mode")
+
+    # Original mode
+    dish_parser = subparsers.add_parser("dish", help="Analyse a specific dish")
+    dish_parser.add_argument("name", nargs="?", default="pasta carbonara")
+
+    # Budget mode
+    budget_parser = subparsers.add_parser("budget", help="Pick best dish within budget")
+    budget_parser.add_argument("--budget", type=float, default=15.0)
+    budget_parser.add_argument("--people", type=int, default=2)
+    budget_parser.add_argument("--diet", default="none")
+
     args = parser.parse_args()
 
     def print_status(msg: str):
         print(f"  [{msg}]")
 
-    print(f"\nRobotic Chef Pipeline - Analysing: {args.dish}")
-    print("=" * 60)
-
-    result = await run_robotic_chef_pipeline(
-        dish_name=args.dish,
-        status_callback=print_status,
-    )
+    if args.mode == "budget" or (hasattr(args, "budget") and args.mode is None):
+        print(f"\nBudget Chef Pipeline — £{args.budget:.2f} for {args.people} people ({args.diet})")
+        print("=" * 60)
+        result = await run_budget_chef_pipeline(
+            budget_gbp=args.budget,
+            people=args.people,
+            dietary_filter=args.diet,
+            status_callback=print_status,
+        )
+    else:
+        dish = getattr(args, "name", "pasta carbonara")
+        print(f"\nRobotic Chef Pipeline — Analysing: {dish}")
+        print("=" * 60)
+        result = await run_robotic_chef_pipeline(dish_name=dish, status_callback=print_status)
 
     print("\n" + "=" * 60)
     print("FOOD ANALYSIS (Agent 1)")
     print("=" * 60)
     print(result["food_analysis"])
-
     print("\n" + "=" * 60)
     print("ROBOT DESIGN (Agent 2)")
     print("=" * 60)

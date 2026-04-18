@@ -1,14 +1,16 @@
 """
-Recipe MCP Server - Food Analysis Tools
-========================================
+Recipe MCP Server - Food Analysis Tools (Extended for Budget Challenge)
+========================================================================
 Session 5: The Challenge - Robotic Chef Platform
 
-This MCP server provides tools for analysing dishes, cooking techniques,
-equipment specifications, and safety requirements. It contains a built-in
-database of dishes with realistic culinary data.
+Extended with three new tools for the Smart Budget RobotChef challenge:
+  - get_nutrition(dish_name)        → protein, carbs, fat, kcal, vitamins
+  - get_price(dish_name, servings)  → cost per serving and total cost in GBP
+  - fit_budget(budget_gbp, people,  → ranked list of dishes that fit the
+              dietary_filter)          budget with nutrition scores
 
-Originally developed in Session 4 (Recipe Agent), included here as a
-self-contained copy so Session 5 works independently.
+All other tools (analyse_dish, get_cooking_techniques, get_equipment_specs,
+get_safety_requirements) are unchanged from the Session 4 original.
 """
 
 import json
@@ -17,7 +19,7 @@ from mcp.server.fastmcp import FastMCP
 mcp = FastMCP("Recipe Agent")
 
 # ---------------------------------------------------------------------------
-# Inline Dish Database
+# Inline Dish Database (unchanged)
 # ---------------------------------------------------------------------------
 
 DISHES = {
@@ -791,7 +793,160 @@ DISHES = {
 }
 
 # ---------------------------------------------------------------------------
-# MCP Tools
+# NEW: Nutrition + Pricing Database
+# ---------------------------------------------------------------------------
+# All values are per-recipe (i.e. for the default servings in DISHES above).
+# The tools scale to the requested number of servings automatically.
+
+NUTRITION = {
+    "pasta carbonara": {
+        "protein_g": 140,       # 35g per serving × 4 servings
+        "carbs_g": 328,
+        "fat_g": 112,
+        "fibre_g": 12,
+        "kcal": 2880,
+        "key_vitamins": ["B12", "B6", "D"],
+        "allergens": ["eggs", "dairy", "gluten"],
+        "vegetarian": False,
+        "vegan": False,
+        "gluten_free": False,
+        "pescatarian": False,
+    },
+    "souffle": {
+        "protein_g": 72,
+        "carbs_g": 88,
+        "fat_g": 64,
+        "fibre_g": 4,
+        "kcal": 1280,
+        "key_vitamins": ["A", "B12", "D"],
+        "allergens": ["eggs", "dairy", "gluten"],
+        "vegetarian": True,
+        "vegan": False,
+        "gluten_free": False,
+        "pescatarian": True,
+    },
+    "sushi rolls": {
+        "protein_g": 100,
+        "carbs_g": 220,
+        "fat_g": 24,
+        "fibre_g": 16,
+        "kcal": 1520,
+        "key_vitamins": ["D", "B12", "C"],
+        "allergens": ["fish", "soy", "sesame"],
+        "vegetarian": False,
+        "vegan": False,
+        "gluten_free": True,
+        "pescatarian": True,
+    },
+    "pizza margherita": {
+        "protein_g": 88,
+        "carbs_g": 360,
+        "fat_g": 72,
+        "fibre_g": 16,
+        "kcal": 2600,
+        "key_vitamins": ["C", "A", "B6"],
+        "allergens": ["gluten", "dairy"],
+        "vegetarian": True,
+        "vegan": False,
+        "gluten_free": False,
+        "pescatarian": True,
+    },
+    "beef stir-fry": {
+        "protein_g": 168,
+        "carbs_g": 72,
+        "fat_g": 56,
+        "fibre_g": 24,
+        "kcal": 1920,
+        "key_vitamins": ["B12", "C", "K"],
+        "allergens": ["soy", "gluten"],
+        "vegetarian": False,
+        "vegan": False,
+        "gluten_free": False,
+        "pescatarian": False,
+    },
+    "chocolate cake": {
+        "protein_g": 96,
+        "carbs_g": 864,
+        "fat_g": 264,
+        "fibre_g": 24,
+        "kcal": 6240,
+        "key_vitamins": ["B2", "D"],
+        "allergens": ["eggs", "dairy", "gluten"],
+        "vegetarian": True,
+        "vegan": False,
+        "gluten_free": False,
+        "pescatarian": True,
+    },
+    "fish and chips": {
+        "protein_g": 152,
+        "carbs_g": 340,
+        "fat_g": 128,
+        "fibre_g": 20,
+        "kcal": 3120,
+        "key_vitamins": ["D", "B12", "B6"],
+        "allergens": ["fish", "gluten"],
+        "vegetarian": False,
+        "vegan": False,
+        "gluten_free": False,
+        "pescatarian": True,
+    },
+    "pad thai": {
+        "protein_g": 112,
+        "carbs_g": 260,
+        "fat_g": 48,
+        "fibre_g": 20,
+        "kcal": 2080,
+        "key_vitamins": ["B3", "C", "A"],
+        "allergens": ["fish", "nuts", "eggs"],
+        "vegetarian": False,
+        "vegan": False,
+        "gluten_free": True,
+        "pescatarian": True,
+    },
+    "french omelette": {
+        "protein_g": 22,
+        "carbs_g": 2,
+        "fat_g": 20,
+        "fibre_g": 0,
+        "kcal": 280,
+        "key_vitamins": ["B12", "D", "A"],
+        "allergens": ["eggs", "dairy"],
+        "vegetarian": True,
+        "vegan": False,
+        "gluten_free": True,
+        "pescatarian": True,
+    },
+    "bread": {
+        "protein_g": 12,          # single loaf
+        "carbs_g": 48,
+        "fat_g": 2,
+        "fibre_g": 3,
+        "kcal": 250,
+        "key_vitamins": ["B1", "B3", "iron"],
+        "allergens": ["gluten"],
+        "vegetarian": True,
+        "vegan": True,
+        "gluten_free": False,
+        "pescatarian": True,
+    },
+}
+
+# Cost of the full recipe in GBP (for the default servings in DISHES)
+PRICES_GBP = {
+    "pasta carbonara": 8.00,
+    "souffle": 11.00,
+    "sushi rolls": 18.00,
+    "pizza margherita": 7.00,
+    "beef stir-fry": 12.00,
+    "chocolate cake": 9.00,
+    "fish and chips": 14.00,
+    "pad thai": 10.00,
+    "french omelette": 2.00,
+    "bread": 1.50,
+}
+
+# ---------------------------------------------------------------------------
+# Original MCP Tools (unchanged)
 # ---------------------------------------------------------------------------
 
 
@@ -805,15 +960,12 @@ def analyse_dish(dish_name: str) -> str:
         dish_name: Name of the dish to analyse (e.g. 'pasta carbonara', 'souffle')
     """
     key = dish_name.lower().strip()
-
-    # Try exact match first, then partial match
     dish = DISHES.get(key)
     if dish is None:
         for db_key, db_dish in DISHES.items():
             if key in db_key or db_key in key:
                 dish = db_dish
                 break
-
     if dish is None:
         available = ", ".join(sorted(DISHES.keys()))
         return json.dumps(
@@ -824,7 +976,6 @@ def analyse_dish(dish_name: str) -> str:
             },
             indent=2,
         )
-
     return json.dumps(dish, indent=2)
 
 
@@ -838,32 +989,22 @@ def get_cooking_techniques(dish_name: str) -> str:
         dish_name: Name of the dish (e.g. 'sushi rolls', 'beef stir-fry')
     """
     key = dish_name.lower().strip()
-
     dish = DISHES.get(key)
     if dish is None:
         for db_key, db_dish in DISHES.items():
             if key in db_key or db_key in key:
                 dish = db_dish
                 break
-
     if dish is None:
         available = ", ".join(sorted(DISHES.keys()))
-        return json.dumps(
-            {
-                "error": f"Dish '{dish_name}' not found.",
-                "available_dishes": available,
-            },
-            indent=2,
-        )
+        return json.dumps({"error": f"Dish '{dish_name}' not found.", "available_dishes": available}, indent=2)
 
     result = {
         "dish": dish["name"],
         "difficulty": dish["difficulty"],
         "techniques": dish["techniques"],
         "total_techniques": len(dish["techniques"]),
-        "critical_techniques": [
-            t for t in dish["techniques"] if t["precision"] == "critical"
-        ],
+        "critical_techniques": [t for t in dish["techniques"] if t["precision"] == "critical"],
         "temperature_range": {
             "min_c": min(t["temperature_c"] for t in dish["techniques"]),
             "max_c": max(t["temperature_c"] for t in dish["techniques"]),
@@ -888,13 +1029,7 @@ def get_equipment_specs(equipment_name: str) -> str:
             "temperature_range_c": {"min": 50, "max": 300},
             "power_watts": 5000,
             "dimensions_cm": {"width": 75, "height": 70, "depth": 65},
-            "features": [
-                "convection fan",
-                "top and bottom heating elements",
-                "temperature probe",
-                "timer",
-                "steam injection",
-            ],
+            "features": ["convection fan", "top and bottom heating elements", "temperature probe", "timer", "steam injection"],
             "precision_c": 5,
             "notes": "Preheat for at least 20 minutes for accurate temperature.",
         },
@@ -904,12 +1039,7 @@ def get_equipment_specs(equipment_name: str) -> str:
             "temperature_range_c": {"min": 100, "max": 350},
             "diameter_cm": 36,
             "material": "carbon steel",
-            "features": [
-                "round bottom",
-                "single long handle",
-                "rapid heat transfer",
-                "seasoned surface",
-            ],
+            "features": ["round bottom", "single long handle", "rapid heat transfer", "seasoned surface"],
             "heat_source": "high-BTU gas burner recommended",
             "notes": "Requires seasoning. Reaches very high temperatures for wok hei.",
         },
@@ -919,13 +1049,7 @@ def get_equipment_specs(equipment_name: str) -> str:
             "temperature_range_c": {"min": 120, "max": 200},
             "capacity_litres": 10,
             "power_watts": 3500,
-            "features": [
-                "thermostat control",
-                "safety cutoff",
-                "basket lift",
-                "oil drain valve",
-                "temperature display",
-            ],
+            "features": ["thermostat control", "safety cutoff", "basket lift", "oil drain valve", "temperature display"],
             "precision_c": 2,
             "notes": "Never exceed 200°C. Monitor oil quality regularly.",
         },
@@ -945,12 +1069,7 @@ def get_equipment_specs(equipment_name: str) -> str:
             "temperature_range_c": {"min": 60, "max": 105},
             "capacity_litres": 3,
             "power_watts": 700,
-            "features": [
-                "fuzzy logic control",
-                "keep warm function",
-                "timer delay",
-                "multiple rice settings",
-            ],
+            "features": ["fuzzy logic control", "keep warm function", "timer delay", "multiple rice settings"],
             "precision_c": 1,
             "notes": "Precise water-to-rice ratio is essential.",
         },
@@ -960,11 +1079,7 @@ def get_equipment_specs(equipment_name: str) -> str:
             "temperature_range_c": {"min": 100, "max": 200},
             "diameter_cm": 20,
             "material": "aluminium with PTFE coating",
-            "features": [
-                "non-stick surface",
-                "induction-compatible base",
-                "ergonomic handle",
-            ],
+            "features": ["non-stick surface", "induction-compatible base", "ergonomic handle"],
             "notes": "Do not exceed 200°C or use metal utensils. Ideal for omelettes and delicate work.",
         },
         "dutch oven": {
@@ -973,11 +1088,7 @@ def get_equipment_specs(equipment_name: str) -> str:
             "temperature_range_c": {"min": 100, "max": 260},
             "capacity_litres": 5.5,
             "material": "enamelled cast iron",
-            "features": [
-                "excellent heat retention",
-                "oven-safe",
-                "tight-fitting lid for steam",
-            ],
+            "features": ["excellent heat retention", "oven-safe", "tight-fitting lid for steam"],
             "notes": "Preheat in oven for bread baking. Very heavy - handle with care.",
         },
         "saucepan": {
@@ -998,17 +1109,9 @@ def get_equipment_specs(equipment_name: str) -> str:
             if key in db_key or db_key in key:
                 equipment = db_equip
                 break
-
     if equipment is None:
         available = ", ".join(sorted(EQUIPMENT_DB.keys()))
-        return json.dumps(
-            {
-                "error": f"Equipment '{equipment_name}' not found.",
-                "available_equipment": available,
-            },
-            indent=2,
-        )
-
+        return json.dumps({"error": f"Equipment '{equipment_name}' not found.", "available_equipment": available}, indent=2)
     return json.dumps(equipment, indent=2)
 
 
@@ -1022,44 +1125,27 @@ def get_safety_requirements(dish_name: str) -> str:
         dish_name: Name of the dish (e.g. 'fish and chips', 'chocolate cake')
     """
     key = dish_name.lower().strip()
-
     dish = DISHES.get(key)
     if dish is None:
         for db_key, db_dish in DISHES.items():
             if key in db_key or db_key in key:
                 dish = db_dish
                 break
-
     if dish is None:
         available = ", ".join(sorted(DISHES.keys()))
-        return json.dumps(
-            {
-                "error": f"Dish '{dish_name}' not found.",
-                "available_dishes": available,
-            },
-            indent=2,
-        )
+        return json.dumps({"error": f"Dish '{dish_name}' not found.", "available_dishes": available}, indent=2)
 
-    # Compile comprehensive safety information
     max_temp = max(dish["temperatures"].values())
     result = {
         "dish": dish["name"],
         "safety_warnings": dish["safety"],
         "temperature_hazards": {
             "max_temperature_c": max_temp,
-            "high_temp_steps": [
-                t["name"]
-                for t in dish["techniques"]
-                if t["temperature_c"] >= 150
-            ],
+            "high_temp_steps": [t["name"] for t in dish["techniques"] if t["temperature_c"] >= 150],
         },
         "equipment_requiring_care": dish["equipment"],
         "critical_techniques": [
-            {
-                "technique": t["name"],
-                "description": t["description"],
-                "temperature_c": t["temperature_c"],
-            }
+            {"technique": t["name"], "description": t["description"], "temperature_c": t["temperature_c"]}
             for t in dish["techniques"]
             if t["precision"] == "critical"
         ],
@@ -1070,6 +1156,265 @@ def get_safety_requirements(dish_name: str) -> str:
             "Keep work surfaces clean and dry.",
             "Handle sharp knives with care - always cut away from body.",
         ],
+    }
+    return json.dumps(result, indent=2)
+
+
+# ---------------------------------------------------------------------------
+# NEW Tool 1: get_nutrition
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+def get_nutrition(dish_name: str, servings: int = 0) -> str:
+    """
+    Return full nutritional information for a dish, scaled to the requested
+    number of servings.  If servings is 0 (default) the recipe-default
+    quantity is returned.
+
+    Returns protein_g, carbs_g, fat_g, fibre_g, kcal, key_vitamins,
+    allergens, and dietary flags (vegetarian, vegan, gluten_free, pescatarian).
+
+    Args:
+        dish_name: Name of the dish (e.g. 'pasta carbonara', 'beef stir-fry')
+        servings:  Number of servings to scale to (0 = recipe default)
+    """
+    key = dish_name.lower().strip()
+
+    dish = DISHES.get(key)
+    if dish is None:
+        for db_key, db_dish in DISHES.items():
+            if key in db_key or db_key in key:
+                key = db_key
+                dish = db_dish
+                break
+
+    if dish is None:
+        available = ", ".join(sorted(DISHES.keys()))
+        return json.dumps(
+            {"error": f"Dish '{dish_name}' not found.", "available_dishes": available},
+            indent=2,
+        )
+
+    nutr = NUTRITION.get(key)
+    if nutr is None:
+        return json.dumps({"error": f"Nutrition data not available for '{dish_name}'."}, indent=2)
+
+    default_servings = dish["servings"]
+    target_servings = servings if servings > 0 else default_servings
+    scale = target_servings / default_servings
+
+    result = {
+        "dish": dish["name"],
+        "servings_requested": target_servings,
+        "servings_default": default_servings,
+        "scale_factor": round(scale, 3),
+        "nutrition_total": {
+            "protein_g": round(nutr["protein_g"] * scale, 1),
+            "carbs_g": round(nutr["carbs_g"] * scale, 1),
+            "fat_g": round(nutr["fat_g"] * scale, 1),
+            "fibre_g": round(nutr["fibre_g"] * scale, 1),
+            "kcal": round(nutr["kcal"] * scale),
+        },
+        "nutrition_per_serving": {
+            "protein_g": round(nutr["protein_g"] / default_servings, 1),
+            "carbs_g": round(nutr["carbs_g"] / default_servings, 1),
+            "fat_g": round(nutr["fat_g"] / default_servings, 1),
+            "fibre_g": round(nutr["fibre_g"] / default_servings, 1),
+            "kcal": round(nutr["kcal"] / default_servings),
+        },
+        "key_vitamins": nutr["key_vitamins"],
+        "allergens": nutr["allergens"],
+        "dietary_flags": {
+            "vegetarian": nutr["vegetarian"],
+            "vegan": nutr["vegan"],
+            "gluten_free": nutr["gluten_free"],
+            "pescatarian": nutr["pescatarian"],
+        },
+    }
+    return json.dumps(result, indent=2)
+
+
+# ---------------------------------------------------------------------------
+# NEW Tool 2: get_price
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+def get_price(dish_name: str, servings: int = 0) -> str:
+    """
+    Return the estimated ingredient cost in GBP for a dish, scaled to the
+    requested number of servings.  If servings is 0 (default) the
+    recipe-default quantity is returned.
+
+    Returns total_cost_gbp, cost_per_serving_gbp, and a value_score
+    (protein_g per pound sterling) to help compare dishes for budget cooking.
+
+    Args:
+        dish_name: Name of the dish (e.g. 'pasta carbonara', 'beef stir-fry')
+        servings:  Number of servings to price (0 = recipe default)
+    """
+    key = dish_name.lower().strip()
+
+    dish = DISHES.get(key)
+    if dish is None:
+        for db_key, db_dish in DISHES.items():
+            if key in db_key or db_key in key:
+                key = db_key
+                dish = db_dish
+                break
+
+    if dish is None:
+        available = ", ".join(sorted(DISHES.keys()))
+        return json.dumps(
+            {"error": f"Dish '{dish_name}' not found.", "available_dishes": available},
+            indent=2,
+        )
+
+    base_price = PRICES_GBP.get(key)
+    if base_price is None:
+        return json.dumps({"error": f"Price data not available for '{dish_name}'."}, indent=2)
+
+    nutr = NUTRITION.get(key, {})
+    default_servings = dish["servings"]
+    target_servings = servings if servings > 0 else default_servings
+    scale = target_servings / default_servings
+
+    total_cost = round(base_price * scale, 2)
+    cost_per_serving = round(base_price / default_servings, 2)
+
+    # Value score: grams of protein per pound sterling (higher = better value)
+    protein_per_serving = nutr.get("protein_g", 0) / default_servings
+    value_score = round(protein_per_serving / cost_per_serving, 2) if cost_per_serving > 0 else 0
+
+    result = {
+        "dish": dish["name"],
+        "servings_requested": target_servings,
+        "servings_default": default_servings,
+        "total_cost_gbp": total_cost,
+        "cost_per_serving_gbp": cost_per_serving,
+        "value_score": {
+            "protein_per_pound_sterling": value_score,
+            "note": "Higher is better — more protein per £1 spent",
+        },
+        "dietary_flags": {
+            "vegetarian": nutr.get("vegetarian", False),
+            "vegan": nutr.get("vegan", False),
+            "gluten_free": nutr.get("gluten_free", False),
+            "pescatarian": nutr.get("pescatarian", False),
+        },
+    }
+    return json.dumps(result, indent=2)
+
+
+# ---------------------------------------------------------------------------
+# NEW Tool 3: fit_budget
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+def fit_budget(budget_gbp: float, people: int, dietary_filter: str = "none") -> str:
+    """
+    Find all dishes that fit within a given budget for a given number of people,
+    ranked by nutrition value (protein per pound sterling).
+
+    dietary_filter options:
+      "none"        — no restriction (default)
+      "vegetarian"  — no meat or fish
+      "vegan"       — no animal products
+      "gluten_free" — no gluten
+      "pescatarian" — no meat, fish allowed
+
+    Returns a ranked list of dishes with cost, protein, kcal, and a
+    recommendation explaining the best trade-off.
+
+    Args:
+        budget_gbp:      Total budget in pounds sterling (e.g. 12.0)
+        people:          Number of people to feed (e.g. 2)
+        dietary_filter:  Dietary restriction string (see above)
+    """
+    df = dietary_filter.lower().strip()
+    valid_filters = {"none", "vegetarian", "vegan", "gluten_free", "pescatarian"}
+    if df not in valid_filters:
+        df = "none"
+
+    candidates = []
+    for key, dish in DISHES.items():
+        nutr = NUTRITION.get(key, {})
+        base_price = PRICES_GBP.get(key)
+        if base_price is None:
+            continue
+
+        # Apply dietary filter
+        if df != "none" and not nutr.get(df, False):
+            continue
+
+        default_servings = dish["servings"]
+        cost_per_serving = base_price / default_servings
+        total_cost = round(cost_per_serving * people, 2)
+
+        if total_cost > budget_gbp:
+            continue  # over budget
+
+        protein_total_g = round((nutr.get("protein_g", 0) / default_servings) * people, 1)
+        kcal_per_serving = round(nutr.get("kcal", 0) / default_servings)
+        value_score = round(protein_total_g / total_cost, 2) if total_cost > 0 else 0
+        budget_remaining = round(budget_gbp - total_cost, 2)
+
+        candidates.append({
+            "dish": dish["name"],
+            "cuisine": dish["cuisine"],
+            "difficulty": dish["difficulty"],
+            "total_cost_gbp": total_cost,
+            "cost_per_serving_gbp": round(cost_per_serving, 2),
+            "budget_remaining_gbp": budget_remaining,
+            "protein_total_g": protein_total_g,
+            "kcal_per_serving": kcal_per_serving,
+            "key_vitamins": nutr.get("key_vitamins", []),
+            "allergens": nutr.get("allergens", []),
+            "value_score_protein_per_pound": value_score,
+            "dietary_flags": {
+                "vegetarian": nutr.get("vegetarian", False),
+                "vegan": nutr.get("vegan", False),
+                "gluten_free": nutr.get("gluten_free", False),
+                "pescatarian": nutr.get("pescatarian", False),
+            },
+        })
+
+    # Sort by value score descending
+    candidates.sort(key=lambda x: -x["value_score_protein_per_pound"])
+
+    if not candidates:
+        return json.dumps(
+            {
+                "error": "No dishes found within budget with the given dietary filter.",
+                "budget_gbp": budget_gbp,
+                "people": people,
+                "dietary_filter": df,
+                "suggestion": "Try increasing the budget or relaxing the dietary filter.",
+            },
+            indent=2,
+        )
+
+    # Build a plain-English recommendation for the top pick
+    top = candidates[0]
+    recommendation = (
+        f"Best value: {top['dish']} at £{top['total_cost_gbp']:.2f} total "
+        f"(£{top['cost_per_serving_gbp']:.2f}/person). "
+        f"Provides {top['protein_total_g']}g protein for {people} people "
+        f"with £{top['budget_remaining_gbp']:.2f} budget remaining. "
+        f"Value score: {top['value_score_protein_per_pound']}g protein per £1."
+    )
+
+    result = {
+        "query": {
+            "budget_gbp": budget_gbp,
+            "people": people,
+            "dietary_filter": df,
+        },
+        "dishes_found": len(candidates),
+        "recommendation": recommendation,
+        "ranked_dishes": candidates,
     }
     return json.dumps(result, indent=2)
 
